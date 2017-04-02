@@ -6,6 +6,7 @@
 #include <fstream>
 #include <stdio.h>
 #include <sys/socket.h>
+#include <sys/sendfile.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <errno.h>
@@ -14,8 +15,11 @@
 #include <sys/file.h>
 #include <netdb.h>
 #include<sstream>
+#include <sys/stat.h>
 
 #define BUFFER_MAX	1024
+
+struct stat stat_buf;
 
 int create_server_socket(char* port, int protocol);
 void handle_client(int sock, struct sockaddr_storage client_addr, socklen_t addr_len);
@@ -51,7 +55,7 @@ void handle_client(int sock, struct sockaddr_storage client_addr, socklen_t addr
         // Once recv() returns 0, the transmission is complete.
         if (bytes_read == 0) {
             std::cout << ("Peer disconnected\n\n");
-            close(sock);
+//            close(sock);
             break;
         }
         if (bytes_read < 0) {
@@ -81,16 +85,19 @@ void handle_client(int sock, struct sockaddr_storage client_addr, socklen_t addr
 //        std::cout << "Get!\n";
         if(path.compare("/") == 0){
             std::cout << "Getting index.html.\n";
-            std::FILE* file;
-            file = fopen("www/index.html", "r");
-//            std::cout << *file.is_open() << '\n';
+            int file;
+            file = open("www/index.html", O_RDONLY);
+            if(file == -1) std::cout << "Failed to open file\n";
             std::string item;
-//            if(file.is_open()) {
-//                while (getline(file, item)) {
-//                    std::cout << item << '\n';
-//                }
-//            }
-            sendfile(sock, file, 0, 256);
+            fstat(file, &stat_buf);
+            off_t offset = 0;
+            int i;
+            char b[25];
+            read(file, b, 24);
+            printf("Yeah Sending file of size %d\n%s\n", stat_buf.st_size, b);
+            i = sendfile(sock, file, &offset, stat_buf.st_size);
+            fprintf(stderr, "error from sendfile: %s\n", strerror(errno));
+            printf("%d bytes sent!\n", i);
         } else{
             // Get the file from the www folder.
 //            send(sock, buffer, strlen(reinterpret_cast<const char*>("hello world"))+1, 0);
@@ -99,6 +106,7 @@ void handle_client(int sock, struct sockaddr_storage client_addr, socklen_t addr
 
     // TODO: Extract Body
     // TODO: Formulate response
+    close(sock);
     return;
 }
 

@@ -1,3 +1,3 @@
-/Users/jk/development/basicWebServer/webserver-handout/cmake-build-debug/CMakeFiles/rebuild_cache.dir
-/Users/jk/development/basicWebServer/webserver-handout/cmake-build-debug/CMakeFiles/edit_cache.dir
-/Users/jk/development/basicWebServer/webserver-handout/cmake-build-debug/CMakeFiles/untitled.dir
+/mnt/hgfs/development/basicWebServer/webserver-handout/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/mnt/hgfs/development/basicWebServer/webserver-handout/cmake-build-debug/CMakeFiles/edit_cache.dir
+/mnt/hgfs/development/basicWebServer/webserver-handout/cmake-build-debug/CMakeFiles/untitled.dir

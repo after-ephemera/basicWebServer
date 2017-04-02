@@ -6,12 +6,16 @@
 
 #IncludeRegexTransform: 
 
-/Users/jk/development/basicWebServer/webserver-handout/main.cpp
+/mnt/hgfs/development/basicWebServer/webserver-handout/main.cpp
 iostream
 -
 fstream
 -
 stdio.h
+-
+sys/socket.h
+-
+sys/sendfile.h
 -
 netinet/in.h
 -
@@ -29,12 +33,16 @@ netdb.h
 -
 sstream
 -
+sys/stat.h
+-
+unistd.h
+-
 
-/Users/jk/development/basicWebServer/webserver-handout/test.cpp
+/mnt/hgfs/development/basicWebServer/webserver-handout/test.cpp
 iostream
 -
 test.h
-/Users/jk/development/basicWebServer/webserver-handout/test.h
+/mnt/hgfs/development/basicWebServer/webserver-handout/test.h
 
-/Users/jk/development/basicWebServer/webserver-handout/test.h
+/mnt/hgfs/development/basicWebServer/webserver-handout/test.h
 
