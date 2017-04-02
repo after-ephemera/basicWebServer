@@ -1,0 +1,25 @@
+Use main.c and tcp_serv_exampl.c from the demo code on google drive as a reference/starting point.
+
+fork() after the call to accept() (see tcp_server_example.c) and then handle the request.
+
+recv() then send() then close() and then return. (all in the child)
+And then call exit() to exit the child process and complete the transaction.
+
+Make sure to reap the child after this point by calling wait().
+You can use a SIGCHLD handler with waitpid(-1)
+http://www.microhowto.info/howto/reap_zombie_processes_using_a_sigchld_handler.html
+
+Basically read the spec.
+
+Receive procedure:
+1. Receive() into a char buffer (until recv() returns 0)
+2. Extract Headers
+3. Extract body
+4. Formulate response
+  a. Set headers (make sure the leave the double newline)
+  b. Add the body
+5. Send() (returns the number of bytes sent) and then repeat until all bytes are sent.
+
+MAKE A MAKEFILE
+
+printf "GET / HTTP/1.1\r\nHost: localhost:8080\r\n\r\n" | nc localhost 8080

@@ -1,0 +1,40 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/jk/development/basicWebServer/webserver-handout/main.cpp
+iostream
+-
+fstream
+-
+stdio.h
+-
+netinet/in.h
+-
+unistd.h
+-
+errno.h
+-
+stdlib.h
+-
+string.h
+-
+sys/file.h
+-
+netdb.h
+-
+sstream
+-
+
+/Users/jk/development/basicWebServer/webserver-handout/test.cpp
+iostream
+-
+test.h
+/Users/jk/development/basicWebServer/webserver-handout/test.h
+
+/Users/jk/development/basicWebServer/webserver-handout/test.h
+
