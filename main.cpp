@@ -16,27 +16,78 @@
 #include <netdb.h>
 #include<sstream>
 #include <sys/stat.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <time.h>
 
 #define BUFFER_MAX	1024
+
+using namespace std;
 
 struct stat stat_buf;
 
 int create_server_socket(char* port, int protocol);
 void handle_client(int sock, struct sockaddr_storage client_addr, socklen_t addr_len);
-void split(const std::string &s, char delim);
+void handle_sigchld(int sig);
+string getDateString();
+string getBasicHeadersString();
+string getContentType(string fileType);
+
+pid_t pid;
 
 int main() {
+    struct sigaction sa;
+    sa.sa_handler = &handle_sigchld;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+    if (sigaction(SIGCHLD, &sa, 0) == -1) {
+        perror(0);
+        exit(1);
+    }
+
+    /* the status integer used to store information about dead children */
+    int status;
 
     int sock = create_server_socket(strdup("8080"), SOCK_STREAM);
     while (1) {
         struct sockaddr_storage client_addr;
         socklen_t client_addr_len = sizeof(client_addr);
+        cout << "Waiting on accept...\n";
         int client = accept(sock, (struct sockaddr*)&client_addr, &client_addr_len);
-        if (client == -1) {
-            perror("accept");
-            continue;
+        pid = fork();
+
+        if (pid < 0) {
+            printf("Fork failed!\n");
+            // 500 Error
         }
-        handle_client(client, client_addr, client_addr_len);
+        else if (pid == 0) { // CHILD
+
+
+            if (client == -1) {
+                perror("accept");
+                continue;
+            }
+            handle_client(client, client_addr, client_addr_len);
+
+            exit(1);
+        }
+        else { // PARENT
+            close(client);
+
+            /**
+              * waitpid typically stops (blocks) the process until a child has exited
+             * or been stopped. Using the WNOHANG parameter here makes waitpid return
+             * immediately instead. This allows us to do other things while we wait
+             * for the child to terminate (such as print things out).
+             * -1 here means we're waiting for any child to die (rather than a specific
+             *  PID)
+             **/
+//            while (waitpid(-1, &status, ) == 0) {
+//                fprintf(stderr,"Waiting for my kid to die...\n");
+//                cout << "Waiting for my kid to die...\n";
+//                sleep(1); // now we sleep
+//            }
+        }
     }
 }
 
@@ -49,12 +100,12 @@ void handle_client(int sock, struct sockaddr_storage client_addr, socklen_t addr
     if (ret != 0) {
         fprintf(stderr, "Failed in getnameinfo: %s\n", gai_strerror(ret));
     }
-    printf("Got a connection from %s:%s\n", client_hostname, client_port);
+    printf("\nGot a connection from %s:%s\n", client_hostname, client_port);
     while (1) {
         int bytes_read = recv(sock, (void*)buffer, BUFFER_MAX-1, 0);
         // Once recv() returns 0, the transmission is complete.
         if (bytes_read == 0) {
-            std::cout << ("Peer disconnected\n\n");
+            cout << ("Peer disconnected\n\n");
 //            close(sock);
             break;
         }
@@ -62,61 +113,109 @@ void handle_client(int sock, struct sockaddr_storage client_addr, socklen_t addr
             perror("recv");
             continue;
         }
-        buffer[bytes_read] = '\0';
         printf("received %d bytes:\n\n", bytes_read);
-//        send(sock, buffer, strlen(reinterpret_cast<const char*>("hello world"))+1, 0);
     }
     printf("\nTotal message:\n%s", buffer);
     // Extract Headers
-//    char verb[32], proto[32], s[32];
-//    sprintf(&(buffer[0]), "%s %s %s\n", verb, s, proto);
-//    printf("Verb: %s Proto: %s\n", verb, proto);
     char delim = ' ';
-    std::stringstream ss;
+    stringstream ss;
     ss.str(buffer);
 
-    std::string verb, path, protocol;
-    std::getline(ss, verb, delim);
-    std::getline(ss, path, delim);
-    std::getline(ss, protocol, delim);
+    string verb, path, protocol;
+    getline(ss, verb, delim);
+    getline(ss, path, delim);
+    getline(ss, protocol, '\r');
 
-    printf("Verb: %s, Path: %s, Protocol: %s\n", verb.c_str(), path.c_str(), protocol.c_str());
+    if(verb.compare("GET") != 0){
+        perror("501 Error");
+        // Give a 501 Error
+        // handle501Error();
+    }
+
+    if(verb.compare("") == 0 || path.compare("") == 0|| protocol.compare("") == 0){
+        perror("Error parsing data");
+    }
+
+//    printf("Verb: [%s], Path: [%s], Protocol: [%s]\n", verb.c_str(), path.c_str(), protocol.c_str());
     if(verb.compare("GET") == 0) {
-//        std::cout << "Get!\n";
+//        cout << "Get!\n";
         if(path.compare("/") == 0){
-            std::cout << "Getting index.html.\n";
+            cout << "Getting index.html.\n";
             int file;
             file = open("www/index.html", O_RDONLY);
-            if(file == -1) std::cout << "Failed to open file\n";
-            std::string item;
+            if(file == -1) cout << "Failed to open file\n";
             fstat(file, &stat_buf);
             off_t offset = 0;
-            int i;
-            char b[25];
-            read(file, b, 24);
-            printf("Yeah Sending file of size %d\n%s\n", stat_buf.st_size, b);
-            i = sendfile(sock, file, &offset, stat_buf.st_size);
-            fprintf(stderr, "error from sendfile: %s\n", strerror(errno));
-            printf("%d bytes sent!\n", i);
+            int bytesWritten;
+//            char b[25];
+//            read(file, b, 24);
+//            printf("Sending file of size %d\n%s\n", stat_buf.st_size, b);
+            string headers = getBasicHeadersString();
+            headers += "Content-Type: text/html\r\n";
+            // TODO: Content length
+            // TODO: Last Modified (then append \r\n\r\n)
+            // TODO: Send() headers first
+
+            while(1) {
+                bytesWritten = sendfile(sock, file, &offset, stat_buf.st_size);
+//                fprintf(stderr, "error from sendfile: %s\n", strerror(errno));
+                printf("%d bytes sent!\n", bytesWritten);
+
+                if(bytesWritten == 0){
+                    break;
+                }
+                if(bytesWritten < 0){
+                    perror("send");
+                    continue;
+                }
+            }
         } else{
             // Get the file from the www folder.
 //            send(sock, buffer, strlen(reinterpret_cast<const char*>("hello world"))+1, 0);
+            cout << "Getting " << path << " file\n";
+            int file;
+            char buf[1024];
+            sprintf(buf, "%s%s", "www", path.c_str());
+            file = open(buf, O_RDONLY);
+            if(file == -1) cout << "Failed to open file\n";
+            fstat(file, &stat_buf);
+            off_t offset = 0;
+            int bytesWritten;
+            string headers = getBasicHeadersString();
+
+            string fileType = path.substr(path.find("."));
+//            cout << fileType << " is the filetype\n";
+            headers += "Content-Type: " + getContentType(fileType);
+            cout << "Headers: " << headers << "\n";
+            // TODO: Content length
+            // TODO: Last Modified (then append \r\n\r\n)
+            // TODO: Send() headers first
+
+            while(1){
+                bytesWritten = sendfile(sock, file, &offset, stat_buf.st_size);
+                printf("%d bytes sent!\n", bytesWritten);
+
+                if(bytesWritten == 0){
+                    break;
+                }
+                if(bytesWritten < 0){
+                    perror("send");
+                    return;
+                }
+            }
         }
     }
-
-    // TODO: Extract Body
-    // TODO: Formulate response
     close(sock);
+//    perror("Close");
     return;
 }
 
-void split(const std::string &s, char delim) {
-    std::stringstream ss;
-    ss.str(s);
-    std::string item;
-    while (std::getline(ss, item, delim)) {
-        printf("Delimited: %s\n", item.c_str());
-    }
+void handle_sigchld(int sig) {
+//    cout << "Got sigchld\n";
+    int saved_errno = errno;
+    while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
+    errno = saved_errno;
+//    cout << "Finished sigchld\n";
 }
 
 int create_server_socket(char* port, int protocol) {
@@ -193,6 +292,45 @@ int create_server_socket(char* port, int protocol) {
     }
 
     return sock;
+}
+
+string getDateString(){
+    time_t rawtime;
+    struct tm * timeinfo;
+    char buffer[256];
+
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+
+    strftime (buffer,180,"%a, %d %b %Y %H:%M:%S %Z",timeinfo);
+    string buf = buffer;
+    return buf;
+//    printf("Date string: %s\n", buffer);
+}
+
+string getBasicHeadersString(){
+    string headers = "Date: ";
+    headers += getDateString() + "\r\n";
+    headers += "Server: Alfred\r\n";
+    return headers;
+}
+
+string getContentType(string fileType){
+    if(fileType.compare(".html") == 0){
+        return string("text/html");
+    } else if(fileType.compare(".jpeg") == 0 || fileType.compare(".jpg") == 0){
+        return string("image/jpeg");
+    } else if(fileType.compare(".pdf") == 0){
+        return string("application/pdf");
+    } else if(fileType.compare(".txt") == 0){
+        return string("text/plain");
+    } else if(fileType.compare(".png") == 0){
+        return string("image/png");
+    } else if(fileType.compare(".gif") == 0){
+        return string("image/gif");
+    } else{
+        return string("text/plain");
+    }
 }
 
 

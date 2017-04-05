@@ -3,7 +3,7 @@ CC = g++
 CC_FLAGS = -w
  
 # File names
-  EXEC = run
+  EXEC = server
   SOURCES = $(wildcard *.cpp)
   OBJECTS = $(SOURCES:.cpp=.o)
    
